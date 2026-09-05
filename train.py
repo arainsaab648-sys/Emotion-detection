@@ -2,24 +2,37 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-## Add detaset path ####
+# =========================
+# Dataset paths
+# =========================
 
 train_dir = "dataset/train"
 test_dir = "dataset/test"
 
-
-## Prepare the Image ##
+# =========================
+# Training data
+# =========================
 
 train_datagen = ImageDataGenerator(
     rescale=1.0 / 255,
-    validation_split=0.2
+    validation_split=0.2,
+    rotation_range=10,
+    width_shift_range=0.1,
+    height_shift_range=0.1,
+    horizontal_flip=True
 )
+
+# =========================
+# Test data
+# =========================
 
 test_datagen = ImageDataGenerator(
     rescale=1.0 / 255
 )
 
-## Load the training Images ##
+# =========================
+# Load training images
+# =========================
 
 train_data = train_datagen.flow_from_directory(
     train_dir,
@@ -30,18 +43,29 @@ train_data = train_datagen.flow_from_directory(
     subset="training"
 )
 
-## Load the validation images ##
+# =========================
+# Validation data
+# =========================
 
-validation_data = train_datagen.flow_from_directory(
+validation_datagen = ImageDataGenerator(
+    rescale=1.0 / 255,
+    validation_split=0.2
+)
+
+validation_data = validation_datagen.flow_from_directory(
     train_dir,
     target_size=(48, 48),
     color_mode="grayscale",
     batch_size=64,
     class_mode="categorical",
-    subset="validation"
+    subset="validation",
+    shuffle=False
 )
 
-## load test images ##
+
+# =========================
+# Load test images
+# =========================
 
 test_data = test_datagen.flow_from_directory(
     test_dir,
@@ -52,73 +76,44 @@ test_data = test_datagen.flow_from_directory(
     shuffle=False
 )
 
-## Create the CNN model ##
+# =========================
+# CNN Model
+# =========================
 
 model = models.Sequential([
     layers.Input(shape=(48, 48, 1)),
 
-    layers.Conv2D(32, (3, 3), activation="relu"),
+    layers.Conv2D(32, (3, 3), padding="same"),
+    layers.BatchNormalization(),
+    layers.Activation("relu"),
     layers.MaxPooling2D((2, 2)),
 
-    layers.Conv2D(64, (3, 3), activation="relu"),
+    layers.Conv2D(64, (3, 3), padding="same"),
+    layers.BatchNormalization(),
+    layers.Activation("relu"),
     layers.MaxPooling2D((2, 2)),
 
-    layers.Conv2D(128, (3, 3), activation="relu"),
+    layers.Conv2D(128, (3, 3), padding="same"),
+    layers.BatchNormalization(),
+    layers.Activation("relu"),
+    layers.MaxPooling2D((2, 2)),
+
+    layers.Conv2D(256, (3, 3), padding="same"),
+    layers.BatchNormalization(),
+    layers.Activation("relu"),
     layers.MaxPooling2D((2, 2)),
 
     layers.Flatten(),
 
-    layers.Dense(128, activation="relu"),
+    layers.Dense(256, activation="relu"),
     layers.Dropout(0.5),
 
     layers.Dense(7, activation="softmax")
 ])
 
-## Input layer shape ##
-
-layers.Input(shape=(48, 48, 1)),
-
-## First convolution ##
-
-layers.Conv2D(32, (3, 3), activation="relu"),
-
-## First pooling layer ##
-
-layers.MaxPooling2D((2, 2)),
-
-## Second convolution ##
-
-layers.Conv2D(64, (3, 3), activation="relu"),
-
-## Second pooling layer ##
-
-layers.MaxPooling2D((2, 2)),
-
-## Third convolution ##
-
-layers.Conv2D(128, (3, 3), activation="relu"),
-
-## Third pooling layer ##
-
-layers.MaxPooling2D((2, 2)),
-
-## Flatten the output ##
-
-layers.Flatten(),
-
-## Dense layer ##
-
-layers.Dense(128, activation="relu"),
-
-## Dropout layer ##
-
-layers.Dropout(0.5),
-
-## Final layer ##
-
-layers.Dense(7, activation="softmax")
-
-## compile the model ##
+# =========================
+# Compile
+# =========================
 
 model.compile(
     optimizer="adam",
@@ -126,41 +121,46 @@ model.compile(
     metrics=["accuracy"]
 )
 
-## Display the model summary ##
-
 model.summary()
 
-## Train the model ##
+# =========================
+# Train ONCE
+# =========================
 
 history = model.fit(
     train_data,
     validation_data=validation_data,
-    epochs=20
+    epochs=30
 )
 
-model.save("model/emotion_model.keras")
+# =========================
+# Training results
+# =========================
 
-print("Model saved successfully!")
+print("\nTraining Results:")
 
-import matplotlib.pyplot as plt
+for i in range(len(history.history["accuracy"])):
+    print(
+        f"Epoch {i+1}: "
+        f"Training Accuracy = {history.history['accuracy'][i]:.4f}, "
+        f"Validation Accuracy = {history.history['val_accuracy'][i]:.4f}"
+    )
 
-# Accuracy graph
-plt.figure()
-plt.plot(history.history["accuracy"], label="Training Accuracy")
-plt.plot(history.history["val_accuracy"], label="Validation Accuracy")
-plt.title("Training and Validation Accuracy")
-plt.xlabel("Epoch")
-plt.ylabel("Accuracy")
-plt.legend()
-plt.show()
+# =========================
+# Evaluate test dataset
+# =========================
 
+test_loss, test_accuracy = model.evaluate(test_data)
 
-# Loss graph
-plt.figure()
-plt.plot(history.history["loss"], label="Training Loss")
-plt.plot(history.history["val_loss"], label="Validation Loss")
-plt.title("Training and Validation Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
+print("\n================================")
+print("Test Loss:", test_loss)
+print("Test Accuracy:", test_accuracy)
+print("================================")
+
+# =========================
+# Save model
+# =========================
+
+model.save("model/emotion_model_final.keras")
+
+print("New model saved successfully!")
